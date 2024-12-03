@@ -15,6 +15,10 @@ import java.io.Serializable;
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class ChartQueryRequest extends PageRequest implements Serializable {
+    /**
+     * 图表名称
+     */
+    private String name;
 
     /**
      * id

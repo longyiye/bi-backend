@@ -5,15 +5,18 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+
 import java.io.Serializable;
 import java.util.Date;
+
 import lombok.Data;
 
 /**
  * 图表信息表
+ *
  * @TableName chart
  */
-@TableName(value ="chart")
+@TableName(value = "chart")
 @Data
 public class Chart implements Serializable {
     /**
@@ -21,6 +24,11 @@ public class Chart implements Serializable {
      */
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
+
+    /**
+     * 图表名称
+     */
+    private String name;
 
     /**
      * 分析目标

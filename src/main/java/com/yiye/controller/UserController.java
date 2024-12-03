@@ -6,7 +6,6 @@ import com.yiye.common.BaseResponse;
 import com.yiye.common.DeleteRequest;
 import com.yiye.common.ErrorCode;
 import com.yiye.common.ResultUtils;
-import com.yiye.config.WxOpenConfig;
 import com.yiye.constant.UserConstant;
 import com.yiye.exception.BusinessException;
 import com.yiye.exception.ThrowUtils;
@@ -20,16 +19,7 @@ import com.yiye.model.entity.User;
 import com.yiye.model.vo.LoginUserVO;
 import com.yiye.model.vo.UserVO;
 import com.yiye.service.UserService;
-
-import java.util.List;
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import lombok.extern.slf4j.Slf4j;
-import me.chanjar.weixin.common.bean.WxOAuth2UserInfo;
-import me.chanjar.weixin.common.bean.oauth2.WxOAuth2AccessToken;
-import me.chanjar.weixin.mp.api.WxMpService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.DigestUtils;
@@ -37,8 +27,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 import static com.yiye.service.impl.UserServiceImpl.SALT;
 
@@ -55,11 +48,6 @@ public class UserController {
 
     @Resource
     private UserService userService;
-
-    @Resource
-    private WxOpenConfig wxOpenConfig;
-
-    // region 登录相关
 
     /**
      * 用户注册
@@ -270,8 +258,6 @@ public class UserController {
         userVOPage.setRecords(userVO);
         return ResultUtils.success(userVOPage);
     }
-
-    // endregion
 
     /**
      * 更新个人信息
