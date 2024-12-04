@@ -275,8 +275,8 @@ public class ChartController {
 
         // 拿到返回结果
         String result = aiManager.sendMsgToXingHuo(true, userInput.toString());
-        // 对返回结果做拆分,按照3个@符号进行拆分
-        String[] splits = result.split("【【【【【");
+        // 对返回结果做拆分,按照5个【 符号进行拆分
+        String[] splits = result.split("'【【【【【'");
         // 拆分之后还要进行校验
         if (splits.length < 3) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
