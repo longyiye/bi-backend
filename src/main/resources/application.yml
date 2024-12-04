@@ -90,6 +90,12 @@ cos:
     secretKey: xxx
     region: xxx
     bucket: xxx
+## 讯飞 AI 配置
+xun-fei:
+  client:
+    appId: 5ba87f65
+    apiSecret: MTg0OGNiYTAzZjQ4MDlhNzBlYmYzYWYy
+    apiKey: b8f9ad3340428e9273bc8fd756741414
 # 接口文档配置
 knife4j:
   enable: true

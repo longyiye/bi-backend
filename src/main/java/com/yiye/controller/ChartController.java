@@ -12,6 +12,7 @@ import com.yiye.constant.CommonConstant;
 import com.yiye.constant.UserConstant;
 import com.yiye.exception.BusinessException;
 import com.yiye.exception.ThrowUtils;
+import com.yiye.manager.AiManager;
 import com.yiye.model.dto.chart.ChartAddRequest;
 import com.yiye.model.dto.chart.ChartEditRequest;
 import com.yiye.model.dto.chart.ChartQueryRequest;
@@ -19,6 +20,7 @@ import com.yiye.model.dto.chart.ChartUpdateRequest;
 import com.yiye.model.dto.chart.GenChartByAiRequest;
 import com.yiye.model.entity.Chart;
 import com.yiye.model.entity.User;
+import com.yiye.model.vo.BiResponseVO;
 import com.yiye.service.ChartService;
 import com.yiye.service.UserService;
 import com.yiye.utils.ExcelUtils;
@@ -54,6 +56,9 @@ public class ChartController {
 
     @Resource
     private ChartService chartService;
+
+    @Resource
+    private AiManager aiManager;
 
     private final static Gson GSON = new Gson();
 
@@ -223,22 +228,78 @@ public class ChartController {
      * @return
      */
     @PostMapping("/gen")
-    public BaseResponse<String> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
-                                             GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
+    public BaseResponse<BiResponseVO> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
+                                                   GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
         String name = genChartByAiRequest.getName();
         String goal = genChartByAiRequest.getGoal();
         String chartType = genChartByAiRequest.getChartType();
+
         // 校验
+        // 如果分析目标为空，就抛出请求参数错误异常，并给出提示
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
-        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
-        // 用户输入
+        // 如果名称不为空，并且名称长度大于 100，就抛出异常，并给出提示
+        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100,
+                ErrorCode.PARAMS_ERROR, "名称过长");
+        // 通过 response 对象拿到用户 id (必须登录才能使用)
+        User loginUser = userService.getLoginUser(request);
+
+        // 指定一个模型 id (把 id 写死，也可以定义成一个常量)
+        long biModelId = 1659171950288818178L;
+        /**
+         * 用户的输入(参考)
+         * 分析需求：
+         * 分析网站用户的增长情况
+         * 原始数据：
+         * 日期,用户数
+         * 1号,10
+         * 2号,20
+         * 3号,30
+        **/
+
+        // 构造用户输入
         StringBuilder userInput = new StringBuilder();
-        userInput.append("你是一个数据分析师，接下来我会给你我的分析目标和原始数据，请告诉我分析结论。").append("\n");
-        userInput.append("分析目标：").append(goal).append("\n");
-        // 压缩后的数据
-        String result = ExcelUtils.excelToCsv(multipartFile);
-        userInput.append("数据：").append(result).append("\n");
-        return ResultUtils.success(userInput.toString());
+        userInput.append("分析需求：").append("\n");
+
+        // 拼接分析目标
+        String userGoal = goal;
+        // 如果图表类型不为空
+        if (StringUtils.isNotBlank(chartType)) {
+            // 就将分析目标拼接上 "请使用" + 图表类型
+            userGoal += "，请使用" + chartType;
+        }
+        userInput.append(userGoal).append("\n");
+        userInput.append("原始数据：").append("\n");
+        // 压缩后的数据（把multipartFile传进来）
+        String csvData = ExcelUtils.excelToCsv(multipartFile);
+        userInput.append(csvData).append("\n");
+
+        // 拿到返回结果
+        String result = aiManager.sendMsgToXingHuo(true, userInput.toString());
+        // 对返回结果做拆分,按照3个@符号进行拆分
+        String[] splits = result.split("【【【【【");
+        // 拆分之后还要进行校验
+        if (splits.length < 3) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
+        }
+
+        String genChart = splits[1].trim();
+        String genResult = splits[2].trim();
+        // 插入到数据库
+        Chart chart = new Chart();
+        chart.setName(name);
+        chart.setGoal(goal);
+        chart.setChartData(csvData);
+        chart.setChartType(chartType);
+        chart.setGenChart(genChart);
+        chart.setGenResult(genResult);
+        chart.setUserId(loginUser.getId());
+        boolean saveResult = chartService.save(chart);
+        ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
+        BiResponseVO biResponse = new BiResponseVO();
+        biResponse.setGenChart(genChart);
+        biResponse.setGenResult(genResult);
+        biResponse.setChartId(chart.getId());
+        return ResultUtils.success(biResponse);
     }
 
     /**
