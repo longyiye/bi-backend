@@ -1,5 +1,6 @@
 package com.yiye.controller;
 
+import cn.hutool.core.io.FileUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.google.gson.Gson;
@@ -39,6 +40,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * 图表接口
@@ -238,8 +241,39 @@ public class ChartController {
         // 如果分析目标为空，就抛出请求参数错误异常，并给出提示
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "目标为空");
         // 如果名称不为空，并且名称长度大于 100，就抛出异常，并给出提示
-        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100,
-                ErrorCode.PARAMS_ERROR, "名称过长");
+        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
+
+        /**
+         * 校验文件
+         *
+         * 首先,拿到用户请求的文件
+         * 取到原始文件大小
+         */
+        long size = multipartFile.getSize();
+        // 取到原始文件名
+        String originalFilename = multipartFile.getOriginalFilename();
+
+        /**
+         * 校验文件大小
+         *
+         * 定义一个常量表示 1MB
+         * 一兆(1MB) = 1024*1024字节(Byte) = 2的20次方字节
+         */
+        final long ONE_MB = 1024 * 1024L;
+        // 如果文件大小，大于一兆，就抛出异常，并提示文件超过 1M
+        ThrowUtils.throwIf(size > ONE_MB, ErrorCode.PARAMS_ERROR, "文件超过 1M");
+
+        /**
+         * 校验文件后缀 (一般文件是 aaa.png，我们要取到.<点> 后面的内容)
+         *
+         * 利用 FileUtil 工具类中的 getSuffix 方法获取文件后缀名
+         */
+        String suffix = FileUtil.getSuffix(originalFilename);
+        // 定义合法的后缀列表
+        final List<String> validFileSuffixList = Arrays.asList("csv", "xlsx");
+        // 如果 suffix 的后缀不在 List 的范围内，抛出异常，并提示 "文件后缀非法"
+        ThrowUtils.throwIf(!validFileSuffixList.contains(suffix), ErrorCode.PARAMS_ERROR, "文件后缀非法");
+
         // 通过 response 对象拿到用户 id (必须登录才能使用)
         User loginUser = userService.getLoginUser(request);
 
@@ -254,7 +288,7 @@ public class ChartController {
          * 1号,10
          * 2号,20
          * 3号,30
-        **/
+         **/
 
         // 构造用户输入
         StringBuilder userInput = new StringBuilder();
@@ -269,36 +303,52 @@ public class ChartController {
         }
         userInput.append(userGoal).append("\n");
         userInput.append("原始数据：").append("\n");
-        // 压缩后的数据（把multipartFile传进来）
+        // 压缩后的数据（把 multipartFile 传进来）
         String csvData = ExcelUtils.excelToCsv(multipartFile);
         userInput.append(csvData).append("\n");
 
         // 拿到返回结果
         String result = aiManager.sendMsgToXingHuo(true, userInput.toString());
-        // 对返回结果做拆分,按照5个【 符号进行拆分
+        // 对返回结果做拆分，按照5个【 符号进行拆分
         String[] splits = result.split("'【【【【【'");
         // 拆分之后还要进行校验
         if (splits.length < 3) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
         }
-
+        // 如果是正确就提取图表代码 (删除多余的空格和换行)
         String genChart = splits[1].trim();
+        // 如果是正确的就提取结论 (删除多余的空格和换行)
         String genResult = splits[2].trim();
+
         // 插入到数据库
         Chart chart = new Chart();
+        // 图表名称
         chart.setName(name);
+        // 分析目标
         chart.setGoal(goal);
+        // 图表数据
         chart.setChartData(csvData);
+        // 图表类型
         chart.setChartType(chartType);
+        // 图表代码
         chart.setGenChart(genChart);
+        // 结论
         chart.setGenResult(genResult);
+        // 谁登录的，就是谁创建的
         chart.setUserId(loginUser.getId());
+        // 如果为真，保存图表到数据库中
         boolean saveResult = chartService.save(chart);
+        // 如果为假，抛出异常，并提示"图表保存失败"
         ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
+
+        // 最后封装到 BiResponseVO 里
         BiResponseVO biResponse = new BiResponseVO();
+        // 设置一下拿到的结果
         biResponse.setGenChart(genChart);
         biResponse.setGenResult(genResult);
+        // 把新生成的图表 id 拿到
         biResponse.setChartId(chart.getId());
+        // 最后，返回 biResponse
         return ResultUtils.success(biResponse);
     }
 
