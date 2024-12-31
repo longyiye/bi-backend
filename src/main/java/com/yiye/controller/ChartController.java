@@ -14,6 +14,7 @@ import com.yiye.constant.UserConstant;
 import com.yiye.exception.BusinessException;
 import com.yiye.exception.ThrowUtils;
 import com.yiye.manager.AiManager;
+import com.yiye.manager.RedisLimiterManager;
 import com.yiye.model.dto.chart.ChartAddRequest;
 import com.yiye.model.dto.chart.ChartEditRequest;
 import com.yiye.model.dto.chart.ChartQueryRequest;
@@ -62,6 +63,9 @@ public class ChartController {
 
     @Resource
     private AiManager aiManager;
+
+    @Resource
+    private RedisLimiterManager redisLimiterManager;
 
     private final static Gson GSON = new Gson();
 
@@ -276,6 +280,9 @@ public class ChartController {
 
         // 通过 response 对象拿到用户 id (必须登录才能使用)
         User loginUser = userService.getLoginUser(request);
+
+        // 限流判断，每个用户一个限流器
+        redisLimiterManager.doRateLimit("genChartByAi_" + loginUser.getId());
 
         // 指定一个模型 id (把 id 写死，也可以定义成一个常量)
         long biModelId = 1659171950288818178L;
